@@ -16,7 +16,6 @@ from pydub import AudioSegment
 
 from app.config import settings
 
-client = Groq(api_key=settings.GROQ_API_KEY)
 MODEL_NAME = settings.GROQ_WHISPER_MODEL
 
 SARVAM_API_KEY = settings.SARVAM_API_KEY
@@ -24,10 +23,28 @@ SARVAM_STT_TRANSLATE_URL = settings.SARVAM_STT_TRANSLATE_URL
 SARVAM_MODEL = settings.SARVAM_STT_MODEL
 SARVAM_PIECE_SECONDS = settings.SARVAM_PIECE_SECONDS
 
+_client = None
+
+
+def get_groq_client() -> Groq:
+    """
+    Lazily construct the Groq client on first use instead of at import
+    time. Every other AI client in this codebase (Mistral in
+    summarizer.py/extractor.py/rag_engine.py, HuggingFace embeddings in
+    vector_store.py) already follows this pattern; this was the one
+    module-level exception, and constructing an external API client
+    during `import app.main` runs before uvicorn binds $PORT — on Render
+    that shows up as "No open ports detected" until the deploy times out.
+    """
+    global _client
+    if _client is None:
+        _client = Groq(api_key=settings.GROQ_API_KEY)
+    return _client
+
 
 def transcribe_chunk_whisper(chunk_path: str) -> str:
     with open(chunk_path, "rb") as audio_file:
-        transcription = client.audio.transcriptions.create(
+        transcription = get_groq_client().audio.transcriptions.create(
             file=audio_file,
             model=MODEL_NAME,
             response_format="text"
