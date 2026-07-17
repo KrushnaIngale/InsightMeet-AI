@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException
 
-from app.services import chat_service
 from app.models.schemas import ChatRequest, ChatResponse
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -9,6 +8,9 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 @router.post("", response_model=ChatResponse)
 def chat(request: ChatRequest):
     """Ask a question about a previously processed document (video/audio/PDF)."""
+    # Imported here, not at module level - see routes_upload.py for why.
+    from app.services import chat_service
+
     try:
         answer = chat_service.ask(request.document_id, request.question)
     except FileNotFoundError:
