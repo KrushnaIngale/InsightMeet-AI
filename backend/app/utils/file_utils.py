@@ -34,12 +34,22 @@ def detect_file_type(filename: str) -> str:
     raise ValueError(f"Unsupported file type: {ext}")
 
 
-def next_document_id() -> str:
-    """document_001, document_002, ... based on existing folders."""
-    existing = [
+def _list_existing_ids() -> list:
+    """List document_* folder names under UPLOADS_DIR, or [] if the
+    directory doesn't exist yet (e.g. a fresh deploy, no upload yet).
+    Deliberately does NOT create the directory - this is a read path.
+    """
+    if not settings.UPLOADS_DIR.exists():
+        return []
+    return [
         d for d in os.listdir(settings.UPLOADS_DIR)
         if os.path.isdir(settings.UPLOADS_DIR / d) and re.match(r"^document_\d+$", d)
     ]
+
+
+def next_document_id() -> str:
+    """document_001, document_002, ... based on existing folders."""
+    existing = _list_existing_ids()
     numbers = [int(d.split("_")[1]) for d in existing] if existing else [0]
     next_num = max(numbers) + 1
     return f"document_{next_num:03d}"
@@ -51,7 +61,10 @@ def _document_path(document_id: str) -> str:
 
 
 def document_dir(document_id: str) -> str:
-    """Path AND creates the folder. Only call this from write paths (upload)."""
+    """Path AND creates the folder (and UPLOADS_DIR itself, via parents=True).
+    Only call this from write paths (upload) — this is the one place in the
+    whole app that creates directories, and it only runs when a request
+    actually needs to write something, never at import time."""
     path = settings.UPLOADS_DIR / document_id
     path.mkdir(parents=True, exist_ok=True)
     return str(path)
@@ -113,7 +126,4 @@ def read_summary_bundle(document_id: str) -> dict:
 
 
 def list_document_ids() -> list:
-    return sorted(
-        d for d in os.listdir(settings.UPLOADS_DIR)
-        if os.path.isdir(settings.UPLOADS_DIR / d) and re.match(r"^document_\d+$", d)
-    )
+    return sorted(_list_existing_ids())

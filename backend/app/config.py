@@ -16,7 +16,13 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent  # backend/
 UPLOADS_DIR = BASE_DIR / "app" / "uploads"
-UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+# NOTE: directory creation is intentionally NOT done here. This module is
+# imported unconditionally by app.main (for ALLOWED_ORIGINS), so any
+# filesystem I/O here runs during `import app.main` - before uvicorn binds
+# $PORT. On Render, UPLOADS_DIR sits on a mounted persistent disk; if that
+# mount is still attaching when the container boots, mkdir() can block on
+# the syscall for a long time. The directory is created lazily on first
+# actual use instead - see app/utils/file_utils.py:ensure_uploads_dir().
 
 
 class Settings:
